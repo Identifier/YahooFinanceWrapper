@@ -1,0 +1,23 @@
+{
+  "name": "YahooFinanceWrapper",
+  "version": "0.0.1",
+  "description": "A wrapper for an external stock price web API that emulates the discontinued Yahoo finance web API.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Identifier/YahooFinanceWrapper.git"
+  },
+  "author": "Identifier",
+  "license": "Unlicense",
+  "bugs": {
+    "url": "https://github.com/Identifier/YahooFinanceWrapper/issues"
+  },
+  "homepage": "https://github.com/Identifier/YahooFinanceWrapper",
+  "dependencies": {
+    "async": "2.5.0",
+    "request": "2.81.0"
+  }
+}
