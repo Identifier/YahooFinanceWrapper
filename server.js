@@ -61,8 +61,10 @@ function getQuote(symbol, callback) {
       "^NYXBT": "NYSE Bitcoin Index"
     }
 
+    var url = intraday;
+    
     request({
-        url : daily,
+        url : url,
         json : true
       },
       function onResponse(err, res, body) {
@@ -82,12 +84,20 @@ function getQuote(symbol, callback) {
         } else if (JSON.stringify(body) == '{}' || body.Information == 'Please consider optimizing your API call frequency.') {
           // Alpha Vantage doesn't provide us a way to request multiple symbols at once, so we'll just keep hammering them.
           request({
-              url : daily,
-              json : true
-            },
-            onResponse);
+            url : url,
+            json : true
+          },
+          onResponse);
+        } else if (body["Error Message"] == "Invalid API call. Please retry or visit the documentation (https://www.alphavantage.co/documentation/) for TIME_SERIES_INTRADAY.") {
+          // Alpha Vantage doesn't support intraday prices for all symbols.
+          url = daily;
+          request({
+            url : url,
+            json : true
+          },
+          onResponse);
         } else {
-          callback(err, '"' + symbol + '",' + 0 + ',"Unknown","' + JSON.stringify(body) +'"');
+          callback(err, '"' + symbol + '",' + 0 + ',"Error","' + JSON.stringify(body) +'"');
         }
       }
     );
