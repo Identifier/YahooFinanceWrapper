@@ -11,11 +11,16 @@ function getQuote(symbol, callback) {
   if (symbol.match(/=/)) {
     const currency = ALPHA_VANTAGE + "&function=CURRENCY_EXCHANGE_RATE&from_currency=" + symbol.substr(0, 3) + "&to_currency=" + symbol.substr(3, 3);
     
+    var url = currency;
+    
+    console.log("Requesting " + url + "...");
     request({
-        url : currency,
+        url : url,
         json : true
       },
       function onResponse(err, res, body) {
+        console.log("Response for " + symbol + ": " + JSON.stringify(body, null, 2).replace(/\\r\\n/g, '\r\n'));
+
         if (body["Realtime Currency Exchange Rate"]) {
           // results from Alpha Vantage take the form:
           // {
@@ -31,7 +36,7 @@ function getQuote(symbol, callback) {
           // }
           // var name1 = body["Realtime Currency Exchange Rate"]["2. From_Currency Name"];
           // var name2 = body["Realtime Currency Exchange Rate"]["4. To_Currency Name"];
-          var n = body["Realtime Currency Exchange Rate"]["1. From_Currency Code"] + '/' + body["Realtime Currency Exchange Rate"]["3. To_Currency Code"]
+          var n = body["Realtime Currency Exchange Rate"]["1. From_Currency Code"] + '/' + body["Realtime Currency Exchange Rate"]["3. To_Currency Code"];
           var l1 = body["Realtime Currency Exchange Rate"]["5. Exchange Rate"];
           var k1 = l1 + ' ' + body["Realtime Currency Exchange Rate"]["6. Last Refreshed"];
           
@@ -40,11 +45,16 @@ function getQuote(symbol, callback) {
           callback(err, '"' + n + '",' + l1 + ',' + k1);
         } else if (JSON.stringify(body) == '{}' || body.Information == 'Please consider optimizing your API call frequency.') {
           // Alpha Vantage doesn't provide us a way to request multiple symbols in one call, so we just have to keep retrying. :(
-          request({
-              url : currency,
-              json : true
-            },
-            onResponse);
+          setTimeout(function () {
+            console.log("Requesting " + url + " again...");
+            request({
+                url : url,
+                json : true
+              },
+              onResponse);
+          }, 1000);
+        } else if (/<title>/.test(body)) {
+          callback(err, '"' + symbol + '",' + 0 + ',"Error","' + body.match(/<title>(.*)<\/title>/)[1] +'"');
         } else {
           callback(err, '"' + symbol + '",' + 0 + ',"Unknown","' + JSON.stringify(body) +'"');
         }
@@ -59,16 +69,19 @@ function getQuote(symbol, callback) {
       "VTSAX": "Vanguard Total Stock Market",
       "SCHK": "Schwab 1000 Index",
       "^NYXBT": "NYSE Bitcoin Index"
-    }
+    };
 
     var url = intraday;
-    
+
+    console.log("Requesting " + url + "...");
     request({
         url : url,
         json : true
       },
       function onResponse(err, res, body) {
-        if (typeof body == 'string') {
+        console.log("Response for " + symbol + ": " + JSON.stringify(body, null , 2).replace(/\\r\\n/g, '\r\n'));
+        
+        if (typeof body == 'string' && !/</.test(body)) {
           // results from Alpha Vantage take the form:
           // timestamp,open,high,low,close,volume 
           // 2017-11-01 16:00:00,84.1400,84.1400,84.0300,84.0500,2281047 
@@ -83,19 +96,25 @@ function getQuote(symbol, callback) {
           callback(err, '"' + s + '",' + l1 + ',"' + x + '","' + n +'"');
         } else if (JSON.stringify(body) == '{}' || body.Information == 'Please consider optimizing your API call frequency.') {
           // Alpha Vantage doesn't provide us a way to request multiple symbols at once, so we'll just keep hammering them.
-          request({
-            url : url,
-            json : true
-          },
-          onResponse);
+          setTimeout(function () {
+            console.log("Requesting " + url + " again...");
+            request({
+              url : url,
+              json : true
+            },
+            onResponse);
+          }, 1000);
         } else if (body["Error Message"] == "Invalid API call. Please retry or visit the documentation (https://www.alphavantage.co/documentation/) for TIME_SERIES_INTRADAY.") {
           // Alpha Vantage doesn't support intraday prices for all symbols.
           url = daily;
+          console.log("Requesting " + url + "...");
           request({
             url : url,
             json : true
           },
           onResponse);
+        } else if (/<title>/.test(body)) {
+          callback(err, '"' + symbol + '",' + 0 + ',"Error","' + body.match(/<title>(.*)<\/title>/)[1] +'"');
         } else {
           callback(err, '"' + symbol + '",' + 0 + ',"Error","' + JSON.stringify(body) +'"');
         }
@@ -113,7 +132,7 @@ function onRequest(req, res) {
     if (query.f != 'sl1xn' && query.f != "nl1k1") {
       res.end("We only support query parameter f=sl1xn (f=nl1k1 for currencies) right now.");
     }
-    async.map(query.s.match(/[^ ]+/g), getQuote, function (err, quotes){
+    async.mapLimit(query.s.match(/[^ ]+/g), 1, getQuote, function (err, quotes){
       if (err) {
         res.end(err);
       } else {
