@@ -67,8 +67,11 @@ function getQuote(symbol, callback) {
       "MSFT": "Microsoft Corporation",
       "FSELX": "Fidelity Select Semiconductors",
       "VTSAX": "Vanguard Total Stock Market",
+      "VTIAX": "Vanguard Intl. Stock Market",
       "SCHK": "Schwab 1000 Index",
-      "^NYXBT": "NYSE Bitcoin Index"
+      "^NYXBT": "NYSE Bitcoin Index",
+      "AGG": "iShares Aggregate Bond Fund",
+      "TIP": "iShares TIPS Bond Fund"
     };
 
     var url = intraday;
