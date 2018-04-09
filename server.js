@@ -29,7 +29,11 @@ function getYahooQuotes (symbols, callback) {
         if (response.error) {
           callback(response.error);
         } else {
-          callback(err, response.result.map(function (quote) { return '"' + quote.symbol + '",' + quote.regularMarketPrice + ',"' + quote.exchange + '","' + (quote.longName || quote.shortName) + '"'; }));
+          callback(err, response.result.map(function (quote) { 
+            return quote.quoteType == "CURRENCY" ?
+              '"' + quote.shortName + '",' + quote.regularMarketPrice + ',' + quote.regularMarketPrice + ' ' + new Date(quote.regularMarketTime * 1000).toLocaleString().replace(/,/, ''):
+              '"' + quote.symbol + '",' + quote.regularMarketPrice + ',"' + quote.exchange + '","' + (quote.longName || quote.shortName) + '"';
+          }));
         }
       }
     }
