@@ -3,10 +3,40 @@ var url = require('url');
 var request = require('request');
 var async = require('async');
 
-// Currently using Alpha Vantage (www.alphavantage.co) for free quotes.
+// Attempt to use the Yahoo Finance V7 API first.
+var YAHOOV7 = "https://query1.finance.yahoo.com/v7/finance/quote";
+// Currently using Alpha Vantage (www.alphavantage.co) for free quotes as a backup if Yahoo is down.
 var ALPHA_VANTAGE = "https://www.alphavantage.co/query?apikey=" + process.env.AVAPIKEY;
 
-function getQuote(symbol, callback) {
+function getYahooQuotes (symbols, callback) {
+  
+  var url = YAHOOV7 + "?symbols=" + symbols.replace(/ /g, ',');
+  
+  console.log("Requesting " + url + "...");
+  request({
+      url : url,
+      json : true
+    },
+    function onResponse(err, res, body) {
+      console.log("Response for " + symbols + ": " + (err || JSON.stringify(body, null, 2).replace(/\\r\\n/g, '\r\n')));
+
+      if (err) { 
+        callback(err);
+      } else if (body.error) {
+        callback(body.error)
+      } else {
+        var response = body.quoteResponse;
+        if (response.error) {
+          callback(response.error);
+        } else {
+          callback(err, response.result.map(function (quote) { return '"' + quote.symbol + '",' + quote.regularMarketPrice + ',"' + quote.exchange + '","' + (quote.longName || quote.shortName) + '"'; }));
+        }
+      }
+    }
+  );
+}
+
+function getAVQuote(symbol, callback) {
 
   if (symbol.match(/=/)) {
     const currency = ALPHA_VANTAGE + "&function=CURRENCY_EXCHANGE_RATE&from_currency=" + symbol.substr(0, 3) + "&to_currency=" + symbol.substr(3, 3);
@@ -19,7 +49,7 @@ function getQuote(symbol, callback) {
         json : true
       },
       function onResponse(err, res, body) {
-        console.log("Response for " + symbol + ": " + JSON.stringify(body, null, 2).replace(/\\r\\n/g, '\r\n'));
+        console.log("Response for " + symbol + ": " + (err || JSON.stringify(body, null, 2).replace(/\\r\\n/g, '\r\n')));
 
         if (body["Realtime Currency Exchange Rate"]) {
           // results from Alpha Vantage take the form:
@@ -135,11 +165,19 @@ function onRequest(req, res) {
     if (query.f != 'sl1xn' && query.f != "nl1k1") {
       res.end("We only support query parameter f=sl1xn (f=nl1k1 for currencies) right now.");
     }
-    async.mapLimit(query.s.match(/[^ ]+/g), 1, getQuote, function (err, quotes){
-      if (err) {
-        res.end(err);
-      } else {
+    // First attempt to use the Yahoo Finance V7 API.
+    getYahooQuotes(query.s, function (err1, quotes) {
+      if (quotes) {
         res.end(quotes.join('\n'));
+      } else {
+        // If that didn't work then use Alpha Vantage (requires each quote separately)
+        async.mapLimit(query.s.match(/[^ ]+/g), 1, getAVQuote, function (err2, quotes) {
+          if (err2) {
+            res.end(err1); // Return the original Yahoo error.
+          } else {
+            res.end(quotes.join('\n'));
+          }
+        });
       }
     });
 }
